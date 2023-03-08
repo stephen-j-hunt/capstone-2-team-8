@@ -12,7 +12,7 @@ public interface AccountDao {
 
     BigDecimal viewBalance(int id);
 
-    Account getAccountById(int id);
+     Account getAccountById(int id);
 
     Account getAccountByUserId(int id);
 
