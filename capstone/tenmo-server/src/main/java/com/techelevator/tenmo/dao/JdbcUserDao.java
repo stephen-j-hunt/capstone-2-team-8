@@ -81,7 +81,9 @@ public class JdbcUserDao implements UserDao {
         String password_hash = new BCryptPasswordEncoder().encode(password);
         Integer newUserId;
         newUserId = jdbcTemplate.queryForObject(sql, Integer.class, username, password_hash);
-
+        String acctsql = "INSERT INTO account (user_id)\n" +
+                "VALUES (?);";
+        jdbcTemplate.update(acctsql, newUserId);
         return (newUserId != null);
     }
 
