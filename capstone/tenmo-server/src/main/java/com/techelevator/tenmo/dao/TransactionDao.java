@@ -10,8 +10,17 @@ public interface TransactionDao {
 
     void sendMoney(Principal principal, int receiveId, BigDecimal amount);
 
-    List<Transaction> myTransfers(int id);
+    List<Transaction> myTransfers(Principal principal);
 
     Transaction transferById(int id);
+
+    void requestMoney (Principal principal, int receiveId, BigDecimal amount);
+
+    List<Transaction> pendingTransfers(Principal principal);
+
+    void approveTransaction(int id);
+
+    void denyTransaction(int id);
+
 
 }

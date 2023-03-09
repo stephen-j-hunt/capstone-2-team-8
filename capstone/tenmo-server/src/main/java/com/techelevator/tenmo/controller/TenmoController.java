@@ -10,8 +10,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @PreAuthorize("isAuthenticated()")
@@ -35,7 +37,26 @@ public class TenmoController {
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(value = "/transfer")
-    public void transferMoney(Principal principal, @RequestParam int receiverId, @RequestParam BigDecimal amount){
-        transactionDao.sendMoney(principal, receiverId, amount);
+    public void transferMoney(Principal principal, @RequestParam int receiverId, @RequestParam BigDecimal amount, @RequestParam boolean isRequest){
+        if(!isRequest){
+            transactionDao.sendMoney(principal, receiverId, amount);
+        } else {
+            transactionDao.requestMoney(principal,receiverId,amount);
+        }
     }
+
+    @GetMapping(value="/transfer/list")
+    public List<Transaction> transactionList(Principal principal){
+      return transactionDao.myTransfers(principal);
+    }
+    @GetMapping(value="/transfer/list/{id}")
+    public Transaction getTransactionById(@Valid @PathVariable int id){
+        return transactionDao.transferById(id);
+    }
+    @GetMapping(value="/transfer/list/pending")
+    public List<Transaction> pendingList(Principal principal) {
+        return transactionDao.pendingTransfers(principal);
+    }
+
+
 }

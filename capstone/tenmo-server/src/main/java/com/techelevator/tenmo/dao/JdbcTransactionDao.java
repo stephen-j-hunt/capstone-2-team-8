@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.security.Principal;
+import java.sql.SQLTransactionRollbackException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -50,33 +52,95 @@ public class JdbcTransactionDao implements TransactionDao{
                          String newTransaction = "INSERT INTO tenmo_transaction(\n" +
                                  "\t sender_id, receiver_id, is_request, status, amount, transaction_time)\n" +
                                  "\tVALUES ( ?, ?, ?, ?, ?, ?);";
-                          jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(),amount, LocalDateTime.now());
+                         jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(),true,amount, LocalDateTime.now());
                         String updateBalanceSql = "UPDATE account\n" +
                                 "\tSET balance=?\n" +
                                 "\tWHERE account_id =?;";
                         jdbcTemplate.update(updateBalanceSql, receiverAccount.getBalance(), receiverAccount.getId());
                         jdbcTemplate.update(updateBalanceSql, currentAccount.getBalance(), currentAccount.getId());
-
-
-
-
-
                     }
                 }
-
             }
-
         }
     }
-
     @Override
-    public List<Transaction> myTransfers(int id) {
-        return null;
+    public List<Transaction> myTransfers(Principal principal) {
+        User currentUser = userDao.findByUsername(principal.getName());
+        Account currentAccount = accountDao.getAccountByUserId(currentUser.getId());
+        List<Transaction> transactions = new ArrayList<>();
+        String sql = "SELECT * \n" +
+                "FROM tenmo_transaction WHERE sender_id=? OR receiver_id=?;";
+        SqlRowSet rowset = jdbcTemplate.queryForRowSet(sql, currentAccount.getId(), currentAccount.getId());
+        while (rowset.next()) {
+            Transaction transaction = mapRowToTransaction(rowset);
+            transactions.add(transaction);
+        }
+        return transactions;
     }
 
     @Override
     public Transaction transferById(int id) {
+        String sql = "Select * \n" +
+                "FROM tenmo_transaction\n" +
+                "WHERE transfer_id=?;";
+        SqlRowSet results= jdbcTemplate.queryForRowSet(sql, id);
+        if (results.next()){
+            return mapRowToTransaction(results);
+        }
         return null;
+    }
+
+    @Override
+    public void requestMoney(Principal principal, int receiveId, BigDecimal amount) {
+        User currentUser = userDao.findByUsername(principal.getName());
+        Account currentAccount = accountDao.getAccountByUserId(currentUser.getId());
+        Account receiverAccount;
+        /*
+        cannot request from self
+        cannot request zero or negative money
+         */
+        if(currentAccount.getId() != receiveId){
+            BigDecimal zero = BigDecimal.ZERO;
+            int res = amount.compareTo(zero);
+            if (res == 1){
+                String sql = "SELECT * FROM account WHERE account_id = ?;";
+                SqlRowSet sqlRowSet = jdbcTemplate.queryForRowSet(sql,receiveId);
+                if(sqlRowSet.next()){
+                    receiverAccount= mapRowToAccount(sqlRowSet);
+                    String newTransaction = "INSERT INTO tenmo_transaction(\n" +
+                            "\ttransfer_id, sender_id, receiver_id, is_request, status, amount, transaction_time)\n" +
+                            "\tVALUES (?, ?, ?, ?, ?, ?, ?);";
+                    jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(),true,false,amount,LocalDateTime.now());
+                }
+            }
+        }
+    }
+
+    @Override
+    public List<Transaction> pendingTransfers(Principal principal) {
+        //returns a list of transactions where status = false
+        User currentUser = userDao.findByUsername(principal.getName());
+        Account currentAccount = accountDao.getAccountByUserId(currentUser.getId());
+        List<Transaction> transactions = new ArrayList<>();
+        String sql = "SELECT *\n" +
+                "\tFROM tenmo_transaction\n" +
+                "\tWHERE status =false AND receiver_id=?;";
+        SqlRowSet rowSet= jdbcTemplate.queryForRowSet(sql,currentAccount.getId());
+        while (rowSet.next()) {
+            Transaction pendingTransactions= mapRowToTransaction(rowSet);
+            transactions.add(pendingTransactions);
+        }
+        return null;
+    }
+
+    @Override
+    public void approveTransaction(int transferId) {
+    // update transaction and then balances
+    }
+
+    @Override
+    public void denyTransaction(int transferId) {
+        //delete transaction
     }
 
     private Account mapRowToAccount(SqlRowSet rs){
@@ -86,4 +150,16 @@ public class JdbcTransactionDao implements TransactionDao{
         account.setBalance(rs.getBigDecimal("balance"));
         return account;
     }
+    private Transaction mapRowToTransaction(SqlRowSet rs){
+        Transaction transaction = new Transaction();
+        transaction.setTransferId(rs.getInt("transfer_id"));
+        transaction.setSenderId(rs.getInt("sender_id"));
+        transaction.setReceiverId(rs.getInt("receiver_id"));
+        transaction.setRequest(rs.getBoolean("is_request"));
+        transaction.setStatus(rs.getBoolean("status"));
+        transaction.setAmount(rs.getBigDecimal("amount"));
+        transaction.setDateTime(rs.getTimestamp("transaction_time").toLocalDateTime());
+        return transaction;
+    }
+
 }
