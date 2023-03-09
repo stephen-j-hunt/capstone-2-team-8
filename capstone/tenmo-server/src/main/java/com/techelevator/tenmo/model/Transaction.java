@@ -12,6 +12,7 @@ public class Transaction {
     private BigDecimal amount;
     private LocalDateTime dateTime;
 
+    public Transaction(){};
     public Transaction(int transferId, int senderId, int receiverId, boolean isRequest, boolean status, BigDecimal amount, LocalDateTime dateTime) {
         this.transferId = transferId;
         this.senderId = senderId;

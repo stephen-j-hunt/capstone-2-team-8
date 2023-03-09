@@ -3,11 +3,12 @@ package com.techelevator.tenmo.dao;
 import com.techelevator.tenmo.model.Transaction;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 
 public interface TransactionDao {
 
-    BigDecimal sendMoney(int sendId, int receiveId, BigDecimal amount);
+    void sendMoney(Principal principal, int receiveId, BigDecimal amount);
 
     List<Transaction> myTransfers(int id);
 
