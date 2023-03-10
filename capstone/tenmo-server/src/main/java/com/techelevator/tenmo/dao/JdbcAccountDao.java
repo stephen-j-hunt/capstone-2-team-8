@@ -22,7 +22,7 @@ public class JdbcAccountDao implements AccountDao{
     @Override
     public List<Account> listAccounts() {
         List<Account> accounts = new ArrayList<>();
-        String sql = "SELECT account_id \n" +
+        String sql = "SELECT * \n" +
                 "FROM account;";
 
         SqlRowSet results = jdbcTemplate.queryForRowSet(sql);

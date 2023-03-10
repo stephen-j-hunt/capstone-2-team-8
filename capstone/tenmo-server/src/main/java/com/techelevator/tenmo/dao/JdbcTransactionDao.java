@@ -52,7 +52,7 @@ public class JdbcTransactionDao implements TransactionDao{
                          String newTransaction = "INSERT INTO tenmo_transaction(\n" +
                                  "\t sender_id, receiver_id, is_request, status, amount, transaction_time)\n" +
                                  "\tVALUES ( ?, ?, ?, ?, ?, ?);";
-                         jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(),true,amount, LocalDateTime.now());
+                         jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(), false,true,amount, LocalDateTime.now());
                         String updateBalanceSql = "UPDATE account\n" +
                                 "\tSET balance=?\n" +
                                 "\tWHERE account_id =?;";
@@ -108,8 +108,8 @@ public class JdbcTransactionDao implements TransactionDao{
                 if(sqlRowSet.next()){
                     receiverAccount= mapRowToAccount(sqlRowSet);
                     String newTransaction = "INSERT INTO tenmo_transaction(\n" +
-                            "\ttransfer_id, sender_id, receiver_id, is_request, status, amount, transaction_time)\n" +
-                            "\tVALUES (?, ?, ?, ?, ?, ?, ?);";
+                            "\t sender_id, receiver_id, is_request, status, amount, transaction_time)\n" +
+                            "\tVALUES ( ?, ?, ?, ?, ?, ?);";
                     jdbcTemplate.update(newTransaction,currentAccount.getId(),receiverAccount.getId(),true,false,amount,LocalDateTime.now());
                 }
             }
@@ -136,11 +136,46 @@ public class JdbcTransactionDao implements TransactionDao{
     @Override
     public void approveTransaction(int transferId) {
     // update transaction and then balances
+        //  sql statement to find the transaction and the user ids* for balance updates
+        Account userAccount = new Account();
+        Account reqAccount = new Account();
+String sql = "SELECT * \n" +
+        "FROM tenmo_transaction\n" +
+        "WHERE transfer_id =?;";
+SqlRowSet rowSet = jdbcTemplate.queryForRowSet(sql, transferId);
+if(rowSet.next()){
+    Transaction pendingTransaction = mapRowToTransaction(rowSet);
+    String requesterSql = "SELECT * \n" +
+            "FROM account\n" +
+            "WHERE account_id = ?;";
+    SqlRowSet rs = jdbcTemplate.queryForRowSet(requesterSql, pendingTransaction.getSenderId());
+    if(rs.next()){
+        reqAccount = mapRowToAccount(rs);
+    }
+    String userSql = "SELECT * \n" +
+            "FROM account\n" +
+            "WHERE account_id = ?;";
+    SqlRowSet sr = jdbcTemplate.queryForRowSet(userSql, pendingTransaction.getReceiverId());
+    if(sr.next()){
+        userAccount = mapRowToAccount(sr);
+    }
+    userAccount.setBalance(userAccount.getBalance().subtract(pendingTransaction.getAmount()));
+    reqAccount.setBalance(reqAccount.getBalance().add(pendingTransaction.getAmount()));
+    String updateBalanceSql = "UPDATE account\n" +
+            "\tSET balance=?\n" +
+            "\tWHERE account_id =?;";
+    jdbcTemplate.update(updateBalanceSql, reqAccount.getBalance(), reqAccount.getId());
+    jdbcTemplate.update(updateBalanceSql, userAccount.getBalance(), userAccount.getId());
+}
     }
 
     @Override
     public void denyTransaction(int transferId) {
         //delete transaction
+        String sql = "DELETE  \n" +
+                "FROM tenmo_transaction \n" +
+                "WHERE transfer_id = ?;";
+        jdbcTemplate.update(sql, transferId);
     }
 
     private Account mapRowToAccount(SqlRowSet rs){

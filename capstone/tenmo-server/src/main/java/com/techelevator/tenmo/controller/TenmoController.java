@@ -58,5 +58,18 @@ public class TenmoController {
         return transactionDao.pendingTransfers(principal);
     }
 
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @PostMapping(value= "/pending/approve")
+    public void approveRequest(@RequestParam int id){
+       transactionDao.approveTransaction(id);
+    }
 
+    @PostMapping(value = "/pending/deny")
+    public void denyRequest(@RequestParam int id){
+        transactionDao.denyTransaction(id);
+    }
+    @GetMapping(value = "/users")
+    public List<Account> listAccounts(){
+        return accountDao.listAccounts();
+    }
 }
